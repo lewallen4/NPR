@@ -7,6 +7,8 @@ let turnSpeed = 0;
 let isAccelerating = false; // Flag for accelerating (up arrow)
 let isDecelerating = false; // Flag for decelerating (down arrow)
 const carHeight = 1.5; // Height of the car from the ground
+let gravity = 0.002; // Gravity constant
+let verticalSpeed = 0; // Speed of falling
 
 function init() {
     scene = new THREE.Scene();
@@ -28,7 +30,7 @@ function init() {
     track.rotation.x = - Math.PI / 2;
     scene.add(track);
 
-    // Add a tree (a green vertical cylinder) - ensuring it sits on the plane
+    // Add a tree (a green vertical cylinder)
     const treeGeometry = new THREE.CylinderGeometry(0.5, 0.5, 5, 32);
     const treeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const tree = new THREE.Mesh(treeGeometry, treeMaterial);
@@ -42,7 +44,7 @@ function init() {
         function (object) {
             car = object; // Assign the loaded object to the global `car` variable
             car.scale.set(1.0, 1.0, 1.0); // Scale the car
-            car.position.y = carHeight; // Place the car on the plane
+            car.position.y = 10; // Start above the ground to allow falling
             scene.add(car);
 
             // Create the spotlight and position it over the car
@@ -76,6 +78,18 @@ function animate() {
     requestAnimationFrame(animate);
 
     if (car) {
+        // Simulate gravity: continuously decrease the car's vertical speed
+        verticalSpeed -= gravity;
+
+        // Adjust the car's y position based on the vertical speed
+        car.position.y += verticalSpeed;
+
+        // Stop falling when the car hits the ground
+        if (car.position.y <= carHeight) {
+            car.position.y = carHeight;
+            verticalSpeed = 0; // Stop vertical movement once on the ground
+        }
+
         // Adjust speed based on acceleration/deceleration when keys are held down
         if (isAccelerating) {
             speed = Math.min(speed + acceleration, maxSpeed); // Gradually increase speed
@@ -94,9 +108,6 @@ function animate() {
         // Update car position based on speed
         car.position.z += Math.cos(car.rotation.y) * speed;
         car.position.x += Math.sin(car.rotation.y) * speed;
-
-        // Ensure the car stays on the plane (no "falling" through the ground)
-        car.position.y = carHeight;
 
         car.rotation.y += turnSpeed;
 
