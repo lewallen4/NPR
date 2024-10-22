@@ -4,17 +4,23 @@ let acceleration = .01; // Acceleration factor per frame
 let deceleration = .0005; // Deceleration factor
 let maxSpeed = 1; // Maximum speed
 let turnSpeed = 0;
-let isAccelerating = false; // Flag for accelerating (up arrow)
-let isDecelerating = false; // Flag for decelerating (down arrow)
+let isAccelerating = false; // Flag for accelerating (W key)
+let isDecelerating = false; // Flag for decelerating (S key)
+let isTurningLeft = false; // Flag for turning left (A key)
+let isTurningRight = false; // Flag for turning right (D key)
 const carHeight = 1.5; // Height of the car from the ground
 let gravity = 0.002; // Gravity constant
 let verticalSpeed = 0; // Speed of falling
 
+const planeWidth = 100; // Width of the gray plane (X direction)
+const planeLength = 1000; // Length of the gray plane (Z direction)
+let tree; // For detecting collisions with the tree
+
 function init() {
     scene = new THREE.Scene();
 
-    // Set up the camera (first-person view)
-    camera = new THREE.PerspectiveCamera(80, window.innerWidth/window.innerHeight, 0.3, 500);
+    // Set up the camera (third-person view)
+    camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.3, 500);
     camera.position.set(0, 1.3, -3);
     camera.lookAt(new THREE.Vector3(0, 1.5, -5));
 
@@ -24,7 +30,7 @@ function init() {
     document.body.appendChild(renderer.domElement);
 
     // Add a basic plane for the track (solid ground)
-    const trackGeometry = new THREE.PlaneGeometry(100, 1000);
+    const trackGeometry = new THREE.PlaneGeometry(planeWidth, planeLength);
     const trackMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
     track = new THREE.Mesh(trackGeometry, trackMaterial);
     track.rotation.x = - Math.PI / 2;
@@ -33,7 +39,7 @@ function init() {
     // Add a tree (a green vertical cylinder)
     const treeGeometry = new THREE.CylinderGeometry(0.5, 0.5, 5, 32);
     const treeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    const tree = new THREE.Mesh(treeGeometry, treeMaterial);
+    tree = new THREE.Mesh(treeGeometry, treeMaterial);
     tree.position.set(2, 2.5, -10); // Tree height is 5, so y position should be 2.5 to place it on the ground
     scene.add(tree);
 
@@ -73,21 +79,69 @@ function init() {
     animate();
 }
 
+// Function to check if the car is over the plane
+function isCarOnTrack() {
+    const halfWidth = planeWidth / 2;
+    const halfLength = planeLength / 2;
+
+    return (
+        car.position.x >= -halfWidth &&
+        car.position.x <= halfWidth &&
+        car.position.z >= -halfLength &&
+        car.position.z <= halfLength
+    );
+}
+
+// Function to check if the car has collided with the tree
+function checkCollisionWithTree() {
+    const treeRadius = 0.5; // Approximate radius of the tree
+    const carRadius = 1; // Approximate radius of the car
+
+    const dx = car.position.x - tree.position.x;
+    const dz = car.position.z - tree.position.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+
+    return distance < (treeRadius + carRadius); // Collision happens if the distance is less than combined radii
+}
+
 // Animate the scene
 function animate() {
     requestAnimationFrame(animate);
 
     if (car) {
-        // Simulate gravity: continuously decrease the car's vertical speed
+        // Apply gravity and make the car fall
         verticalSpeed -= gravity;
 
-        // Adjust the car's y position based on the vertical speed
-        car.position.y += verticalSpeed;
+        // Check if the car is on the track
+        const onTrack = isCarOnTrack();
 
-        // Stop falling when the car hits the ground
-        if (car.position.y <= carHeight) {
-            car.position.y = carHeight;
-            verticalSpeed = 0; // Stop vertical movement once on the ground
+        if (onTrack) {
+            // If the car is above the plane, let it fall to the plane level
+            if (car.position.y > carHeight) {
+                car.position.y += verticalSpeed;
+            }
+
+            // Once it reaches the plane, stop falling and reset vertical speed
+            if (car.position.y <= carHeight) {
+                car.position.y = carHeight;
+                verticalSpeed = 0; // Stop falling once on the ground
+            }
+        } else {
+            // If the car is off the plane, keep it falling
+            car.position.y += verticalSpeed;
+        }
+
+        // Check for collision with the tree
+        if (checkCollisionWithTree()) {
+            // Reduce speed by 95%
+            speed *= 0.05;
+
+            // Reverse direction based on where the collision happened
+            const dx = car.position.x - tree.position.x;
+            const dz = car.position.z - tree.position.z;
+            const angleOfCollision = Math.atan2(dz, dx);
+
+            car.rotation.y = angleOfCollision + Math.PI; // Face opposite direction of impact
         }
 
         // Adjust speed based on acceleration/deceleration when keys are held down
@@ -126,19 +180,23 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Key controls
+// Key controls using WASD for driving
 window.addEventListener('keydown', (event) => {
     switch(event.key) {
-        case 'ArrowUp':
-            isAccelerating = true; // Start accelerating
+        case 'w': // W key for accelerating
+        case 'W':
+            isAccelerating = true;
             break;
-        case 'ArrowDown':
-            isDecelerating = true; // Start decelerating
+        case 's': // S key for decelerating
+        case 'S':
+            isDecelerating = true;
             break;
-        case 'ArrowLeft':
+        case 'a': // A key for turning left
+        case 'A':
             turnSpeed = 0.05;
             break;
-        case 'ArrowRight':
+        case 'd': // D key for turning right
+        case 'D':
             turnSpeed = -0.05;
             break;
     }
@@ -146,15 +204,19 @@ window.addEventListener('keydown', (event) => {
 
 window.addEventListener('keyup', (event) => {
     switch(event.key) {
-        case 'ArrowUp':
-            isAccelerating = false; // Stop accelerating
+        case 'w': // Stop accelerating
+        case 'W':
+            isAccelerating = false;
             break;
-        case 'ArrowDown':
-            isDecelerating = false; // Stop decelerating
+        case 's': // Stop decelerating
+        case 'S':
+            isDecelerating = false;
             break;
-        case 'ArrowLeft':
-        case 'ArrowRight':
-            turnSpeed = 0; // Stop turning
+        case 'a': // Stop turning left
+        case 'A':
+        case 'd': // Stop turning right
+        case 'D':
+            turnSpeed = 0;
             break;
     }
 });
