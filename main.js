@@ -1,6 +1,12 @@
-let scene, camera, renderer, car, track;
-let speed = 0.00; // Constant forward movement
+let scene, camera, renderer, car, track, spotlight;
+let speed = 0.00; // Current speed
+let acceleration = .01; // Acceleration factor per frame
+let deceleration = .0005; // Deceleration factor
+let maxSpeed = 1; // Maximum speed
 let turnSpeed = 0;
+let isAccelerating = false; // Flag for accelerating (up arrow)
+let isDecelerating = false; // Flag for decelerating (down arrow)
+const carHeight = 1.5; // Height of the car from the ground
 
 function init() {
     scene = new THREE.Scene();
@@ -15,18 +21,18 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Add a basic plane for the track
+    // Add a basic plane for the track (solid ground)
     const trackGeometry = new THREE.PlaneGeometry(100, 1000);
-    const trackMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
+    const trackMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
     track = new THREE.Mesh(trackGeometry, trackMaterial);
     track.rotation.x = - Math.PI / 2;
     scene.add(track);
 
-    // Add a tree (a green vertical cylinder)
+    // Add a tree (a green vertical cylinder) - ensuring it sits on the plane
     const treeGeometry = new THREE.CylinderGeometry(0.5, 0.5, 5, 32);
     const treeMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const tree = new THREE.Mesh(treeGeometry, treeMaterial);
-    tree.position.set(2, 2.5, -10);
+    tree.position.set(2, 2.5, -10); // Tree height is 5, so y position should be 2.5 to place it on the ground
     scene.add(tree);
 
     // Load the car model
@@ -35,8 +41,19 @@ function init() {
         'http://localhost:8000/Desktop/3js/car2.obj',
         function (object) {
             car = object; // Assign the loaded object to the global `car` variable
-            car.scale.set(1.0, 1.0, 1.0); // Scale down the car to 50%
+            car.scale.set(1.0, 1.0, 1.0); // Scale the car
+            car.position.y = carHeight; // Place the car on the plane
             scene.add(car);
+
+            // Create the spotlight and position it over the car
+            spotlight = new THREE.SpotLight(0xffffff, 1);
+            spotlight.position.set(0, 10, 0); // Initial position (over the car)
+            spotlight.angle = Math.PI / 4; // Spotlight cone angle
+            spotlight.penumbra = 0.1; // Soft edges of the spotlight
+            spotlight.castShadow = true; // Enable shadows
+
+            // Add spotlight to the scene
+            scene.add(spotlight);
         },
         function (xhr) {
             console.log((xhr.loaded / xhr.total * 100) + '% loaded');
@@ -59,14 +76,40 @@ function animate() {
     requestAnimationFrame(animate);
 
     if (car) {
+        // Adjust speed based on acceleration/deceleration when keys are held down
+        if (isAccelerating) {
+            speed = Math.min(speed + acceleration, maxSpeed); // Gradually increase speed
+        }
+        if (isDecelerating) {
+            speed = Math.max(speed - acceleration, -maxSpeed); // Gradually decrease speed (reverse)
+        }
+
+        // Gradually slow down the car when no key is pressed
+        if (!isAccelerating && !isDecelerating) {
+            if (speed > 0) speed -= deceleration;
+            if (speed < 0) speed += deceleration;
+            if (Math.abs(speed) < deceleration) speed = 0; // Stop when slow enough
+        }
+
+        // Update car position based on speed
         car.position.z += Math.cos(car.rotation.y) * speed;
         car.position.x += Math.sin(car.rotation.y) * speed;
+
+        // Ensure the car stays on the plane (no "falling" through the ground)
+        car.position.y = carHeight;
+
         car.rotation.y += turnSpeed;
 
-        const cameraOffset = new THREE.Vector3(0, .7, -2.0); // Keep this as the desired offset
+        // Update camera position
+        const cameraOffset = new THREE.Vector3(0, .7, -2.0); // Desired offset
         const cameraPosition = cameraOffset.applyMatrix4(car.matrixWorld); 
         camera.position.copy(cameraPosition);
         camera.lookAt(car.position.x, car.position.y + .8, car.position.z); // Look at the car
+
+        // Update spotlight position and direction
+        spotlight.position.set(car.position.x, car.position.y + 10, car.position.z);
+        spotlight.target.position.set(car.position.x, car.position.y, car.position.z);
+        spotlight.target.updateMatrixWorld(); // Ensure spotlight target is updated
     }
 
     renderer.render(scene, camera);
@@ -76,10 +119,10 @@ function animate() {
 window.addEventListener('keydown', (event) => {
     switch(event.key) {
         case 'ArrowUp':
-            speed = 0.1;
+            isAccelerating = true; // Start accelerating
             break;
         case 'ArrowDown':
-            speed = -0.1;
+            isDecelerating = true; // Start decelerating
             break;
         case 'ArrowLeft':
             turnSpeed = 0.05;
@@ -91,11 +134,17 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('keyup', (event) => {
-    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        speed = 0.00;
-    }
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        turnSpeed = 0;
+    switch(event.key) {
+        case 'ArrowUp':
+            isAccelerating = false; // Stop accelerating
+            break;
+        case 'ArrowDown':
+            isDecelerating = false; // Stop decelerating
+            break;
+        case 'ArrowLeft':
+        case 'ArrowRight':
+            turnSpeed = 0; // Stop turning
+            break;
     }
 });
 
