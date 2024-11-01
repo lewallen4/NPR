@@ -27,14 +27,26 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-// Retrieve the selected car model
-const selectedModel = localStorage.getItem('selectedModel');
-const carModelUrl = selectedModel === '2' ? 'http://localhost:8000/cars/car2.obj' : 'http://localhost:8000/cars/car1.obj';
+    // Retrieve the selected car model
+    const selectedModel = localStorage.getItem('selectedModel');
+    let carModelUrl;
+
+    // Choose the correct model URL based on the selected model number
+    if (selectedModel === '1') {
+        carModelUrl = 'http://localhost:8000/cars/car1.obj';
+    } else if (selectedModel === '2') {
+        carModelUrl = 'http://localhost:8000/cars/car2.obj';
+    } else if (selectedModel === '3') {
+        carModelUrl = 'http://localhost:8000/cars/car3.obj';
+    } else {
+        console.warn('Selected model not found, defaulting to car1');
+        carModelUrl = 'http://localhost:8000/cars/car1.obj';
+    }
 
 
 
 // Position and add the speedometer sprite in front of the camera
-    scene.add(speedometerSprite);
+scene.add(speedometerSprite);
 
 // Spotlight setup
 const spotlight = new THREE.SpotLight(0xffffff); // White color for the first spotlight
@@ -130,49 +142,49 @@ scene.add(spotlight9.target);
 
 
 
-    // Physics setup
-    world = new CANNON.World();
-    world.gravity.set(0, -9.82, 0);
+// Physics setup
+world = new CANNON.World();
+world.gravity.set(0, -9.82, 0);
 
-    // Materials for icy effect
-    const lowFrictionMaterial = new CANNON.Material("lowFrictionMaterial");
+// Materials for icy effect
+const lowFrictionMaterial = new CANNON.Material("lowFrictionMaterial");
 
-    // Set low friction and low restitution for stable sliding
-    const contactMaterial = new CANNON.ContactMaterial(lowFrictionMaterial, lowFrictionMaterial, {
-        friction: 0.001, // Extremely low friction for an icy effect
-        restitution: 0.01 // Low restitution to avoid bouncing
+// Set low friction and low restitution for stable sliding
+const contactMaterial = new CANNON.ContactMaterial(lowFrictionMaterial, lowFrictionMaterial, {
+    friction: 0.001, // Extremely low friction for an icy effect
+    restitution: 0.01 // Low restitution to avoid bouncing
+});
+world.addContactMaterial(contactMaterial);
+
+// Load the new platform model
+const platformLoader = new THREE.OBJLoader();
+platformLoader.load('http://localhost:8000/platform.obj', function (obj) {
+    platformBody = obj;
+    platformBody.scale.set(1, 1, 1); // Adjust scale if needed
+    platformBody.position.set(0, 0, 0);
+    platformBody.rotation.x = Math.PI / 2;
+    scene.add(platformBody);
+
+// Cannon.js body for the platform model
+    const platformShape = new CANNON.Box(new CANNON.Vec3(1000, 0.5, 1000)); // Adjust size to fit your platform
+    const platformPhysicsBody = new CANNON.Body({ 
+        mass: 0, // Static platform, unaffected by gravity
+        material: lowFrictionMaterial
     });
-    world.addContactMaterial(contactMaterial);
-
-    // Load the new platform model
-    const platformLoader = new THREE.OBJLoader();
-    platformLoader.load('http://localhost:8000/platform.obj', function (obj) {
-        platformBody = obj;
-        platformBody.scale.set(1, 1, 1); // Adjust scale if needed
-        platformBody.position.set(0, 0, 0);
-        platformBody.rotation.x = Math.PI / 2;
-        scene.add(platformBody);
-
-        // Cannon.js body for the platform model
-        const platformShape = new CANNON.Box(new CANNON.Vec3(1000, 0.5, 1000)); // Adjust size to fit your platform
-        const platformPhysicsBody = new CANNON.Body({ 
-            mass: 0, // Static platform, unaffected by gravity
-            material: lowFrictionMaterial
-        });
-        platformPhysicsBody.addShape(platformShape);
-        platformPhysicsBody.position.set(0, 0, 0);
-        world.addBody(platformPhysicsBody);
+    platformPhysicsBody.addShape(platformShape);
+    platformPhysicsBody.position.set(0, 0, 0);
+    world.addBody(platformPhysicsBody);
     });
 
 
 
 
 // Load OBJ model for the car based on the selected model
-const loader = new THREE.OBJLoader();
-loader.load(carModelUrl, function (obj) {
-    model = obj;
-    model.scale.set(2, 2, 2); // Scale as needed
-    scene.add(model);
+    const loader = new THREE.OBJLoader();
+    loader.load(carModelUrl, function (obj) {
+        model = obj;
+        model.scale.set(2, 2, 2); // Scale as needed
+        scene.add(model);
 
     // Rotate the model 90 degrees forward along the X-axis if needed
     model.rotation.x = Math.PI / 2;

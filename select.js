@@ -1,8 +1,8 @@
 // Variables for scene elements
-let scene, camera, renderer, carModel1, carModel2;
+let scene, camera, renderer, carModel1, carModel2, carModel3;
 let cylinder1, cylinder2;
 let leftArrow, rightArrow, selectTextSprite;
-let selectedModel = 1; // 1 for carModel1, 2 for carModel2
+let selectedModel = 1; // 1 for carModel1, 2 for carModel2, 3 for carModel3
 
 // Initialize the selection screen
 function initSelectionScreen() {
@@ -72,6 +72,16 @@ function initSelectionScreen() {
         scene.add(carModel2);
     });
 
+    // Load the third car model and make it initially invisible
+    loader.load('http://localhost:8000/cars/car3.obj', function (obj) {
+        carModel3 = obj;
+        carModel3.scale.set(1, 1, 1);
+        carModel3.position.set(0, 0.88, 0);
+        carModel3.castShadow = true;
+        carModel3.visible = false; // Start with carModel3 hidden
+        scene.add(carModel3);
+    });
+
     // Create HUD elements
     createHUD();
 
@@ -129,13 +139,20 @@ function handleKeyPress(event) {
 
 // Toggle between car models
 function toggleCarModel() {
+    // Hide all cars
+    carModel1.visible = false;
+    carModel2.visible = false;
+    carModel3.visible = false;
+
+    // Toggle through models
     if (selectedModel === 1) {
-        carModel1.visible = false;
         carModel2.visible = true;
         selectedModel = 2;
+    } else if (selectedModel === 2) {
+        carModel3.visible = true;
+        selectedModel = 3;
     } else {
         carModel1.visible = true;
-        carModel2.visible = false;
         selectedModel = 1;
     }
 }
@@ -163,6 +180,8 @@ function animate() {
         carModel1.rotation.y += 0.01;
     } else if (carModel2 && carModel2.visible) {
         carModel2.rotation.y += 0.01;
+    } else if (carModel3 && carModel3.visible) {
+        carModel3.rotation.y += 0.01;
     }
 
     // Update HUD element positions to stay fixed with the camera
